@@ -20,6 +20,68 @@
         .pano-bg { height: 130px; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; background-color: #f1f5f9; }
         .column-scroll { height: calc(100vh - 160px); overflow-y: auto; }
         #authOverlay { position: fixed; inset: 0; background: #0f172a; z-index: 100; display: flex; align-items: center; justify-content: center; }
+
+        /* 针对手机端的最终加强版补丁 */
+@media (max-width: 768px) {
+    /* 1. 允许整体滚动 */
+    body { 
+        overflow-y: auto !important; 
+        flex-direction: column !important; 
+        height: auto !important;
+    }
+
+    /* 2. 侧边栏宽度撑满，高度根据内容自适应 */
+    .sidebar { 
+        width: 100% !important; 
+        height: auto !important; 
+        min-height: 300px; /* 给列表一个基础高度 */
+        position: relative !important; 
+        flex-shrink: 0 !important;
+    }
+
+    /* 3. 核心修复：强行显示被 hidden 隐藏的内容区域 */
+    /* 只要是在手机上，一旦进入了工作台，就强行把 display:none 覆盖掉 */
+    main, 
+    main#mainContent, 
+    header#topBar,
+    div#mainContent { 
+        display: flex !important; 
+        visibility: visible !important;
+        opacity: 1 !important;
+        overflow: visible !important; 
+        height: auto !important; 
+        width: 100% !important;
+    }
+
+    /* 4. 三列布局强制转为单列垂直排列 */
+    #mainContent { 
+        flex-direction: column !important; 
+        padding: 15px !important;
+        gap: 30px !important; 
+    }
+
+    /* 5. 每一列取消滚动，随页面整体滚动 */
+    .column-scroll { 
+        height: auto !important; 
+        overflow: visible !important; 
+    }
+
+    /* 6. 顶部栏适配 */
+    #topBar { 
+        position: sticky; 
+        top: 0; 
+        z-index: 40; 
+        background: white !important;
+        border-bottom: 1px solid #e2e8f0;
+        justify-content: space-between !important;
+    }
+
+    /* 7. 资产卡片宽度优化 */
+    .asset-card {
+        width: 100% !important;
+        margin-bottom: 15px;
+    }
+}
     </style>
 </head>
 <body class="h-screen flex">
