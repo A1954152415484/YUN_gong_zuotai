@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>山屿空间 | 云工作台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap');
+        :root { --theme-color: #3b82f6; --bg-main: #f8fafc; --bg-side: #0f172a; --bg-card: #ffffff; --text-main: #1e293b; --border-color: #e2e8f0; }
+        body { font-family: 'Noto Sans SC', sans-serif; background-color: var(--bg-main); color: var(--text-main); overflow: hidden; }
+        #customerList::-webkit-scrollbar, .column-scroll::-webkit-scrollbar { width: 4px; }
+        #customerList::-webkit-scrollbar-thumb, .column-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        .sidebar { background-color: var(--bg-side); width: 260px; color: #94a3b8; }
+        .sidebar-item-active { background: var(--theme-color) !important; color: white !important; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+        .asset-card { border: 1px solid var(--border-color); background: var(--bg-card); transition: all 0.2s; border-radius: 12px; overflow: hidden; position: relative; }
+        .asset-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        .pano-bg { height: 130px; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; background-color: #f1f5f9; }
+        .column-scroll { height: calc(100vh - 160px); overflow-y: auto; }
+        #authOverlay { position: fixed; inset: 0; background: #0f172a; z-index: 100; display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body class="h-screen flex">
+
+<div id="authOverlay">
+    <div class="text-center space-y-6">
+        <h2 class="text-white text-2xl font-black tracking-widest italic uppercase">山屿空间</h2>
+        <div class="flex flex-col gap-4">
+            <input id="passInput" type="password" placeholder="请输入密钥..." class="px-6 py-3 rounded-full bg-white/10 text-white border border-white/20 outline-none focus:ring-2 ring-blue-500 text-center">
+            <button onclick="verifyPass()" class="bg-blue-600 text-white px-8 py-3 rounded-full font-bold hover:bg-blue-500 transition">验证并进入</button>
+        </div>
+    </div>
+</div>
+
+<aside class="sidebar flex flex-col shadow-2xl z-20">
+    <div class="p-6 flex justify-between items-center text-white">
+        <h1 class="font-black text-xl italic tracking-tighter">云工作台</h1>
+        <div id="statusDot" class="w-2 h-2 rounded-full bg-orange-500"></div>
+    </div>
+    <div class="px-4 mb-4"><input id="searchQuery" oninput="renderCustomerList()" placeholder="搜索项目..." class="w-full rounded-lg p-2.5 text-xs bg-white/5 text-white outline-none border border-white/10"></div>
+    <div id="customerList" class="flex-1 overflow-y-auto px-4 space-y-1"></div>
+    <div class="p-4 border-t border-white/5 space-y-2">
+        <button onclick="logout()" class="w-full py-2 text-[10px] text-white/20 hover:text-white/60 transition font-bold uppercase">安全退出</button>
+        <button onclick="addCustomer()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition">新建工作项目</button>
+    </div>
+</aside>
+
+<main class="flex-1 flex flex-col relative">
+    <header id="topBar" class="hidden h-16 border-b px-8 flex items-center justify-between bg-white/80 backdrop-blur-md">
+        <h2 id="currentCustomerTitle" class="text-sm font-black text-slate-700"></h2>
+        <div class="flex gap-2">
+            <button onclick="copyDeliveryInfo()" class="px-3 py-1.5 bg-blue-50/50 text-blue-600 rounded-lg text-[10px] font-bold">📋 复制清单</button>
+            <button onclick="openModal()" class="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-[10px] font-bold shadow-lg">+ 新增资产</button>
+        </div>
+    </header>
+    <div id="mainContent" class="hidden flex-1 p-6 flex gap-6">
+        <div class="flex-1 min-w-[280px]"><h3 class="text-[10px] font-black opacity-30 mb-4 tracking-widest uppercase">720 全景预览</h3><div id="col-pano" class="column-scroll space-y-4"></div></div>
+        <div class="flex-1 min-w-[280px]"><h3 class="text-[10px] font-black opacity-30 mb-4 tracking-widest uppercase">平面图 / 方案图</h3><div id="col-plan" class="column-scroll space-y-4"></div></div>
+        <div class="flex-1 min-w-[280px]"><h3 class="text-[10px] font-black opacity-30 mb-4 tracking-widest uppercase">项目工程文件</h3><div id="col-file" class="column-scroll space-y-3"></div></div>
+    </div>
+</main>
+
+<div id="modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-3xl p-8 w-80 shadow-2xl border border-slate-200">
+        <h3 id="modalTitle" class="text-xs font-black mb-4 uppercase text-slate-400">新增资产</h3>
+        <div class="space-y-4">
+            <select id="itemType" class="w-full p-2.5 rounded-xl text-xs font-bold border bg-gray-50 outline-none">
+                <option value="pano">720 全景</option>
+                <option value="plan">彩平图</option>
+                <option value="file">项目文件</option>
+            </select>
+            <input id="itemTitle" type="text" placeholder="资产标题" class="w-full p-2.5 rounded-xl text-xs border outline-none">
+            <input id="itemUrl" type="text" placeholder="链接地址" class="w-full p-2.5 rounded-xl text-xs border outline-none">
+            <input id="itemCover" type="text" placeholder="封面图链接 (可选)" class="w-full p-2.5 rounded-xl text-xs border outline-none">
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeModal()" class="flex-1 text-xs opacity-50 font-bold">取消</button>
+                <button onclick="saveItem()" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold">同步云端</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    /** * 🔐 核心部分
+     * 在这里替换
+     */
+    const _CONF = "U2FsdGVkX18A4W9U02O7K9wPOinJBysSt1b1qK87oocyqOF+9J3KUAetclNLPjG3DFlgFkFllmxhHFJpASxkw81VN0HOVaZqe1srOiCIoIaEnQjuxQPl2OU82vYmsdv7f+auAlSZB/yU46hTLxFwZHOks/wtMrf9spizjs7Pkl0="; 
+
+    let data = {};
+    let client = null;
+    let currentCustomer = '';
+    let isInitialized = false;
+    let editingIndex = -1; 
+
+    // 逻辑
+    function verifyPass() {
+        const pass = document.getElementById('passInput').value.trim();
+        if(!pass) return;
+
+        try {
+            // 核心
+            const bytes = CryptoJS.AES.decrypt(_CONF, pass);
+            const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+            
+            if (!decrypted) throw new Error();
+
+            const config = JSON.parse(decrypted);
+            // 验证
+            if (config.u && config.k) {
+                sessionStorage.setItem('_auth_token', btoa(pass));
+                enterWorkbench(config.u, config.k);
+            }
+        } catch (e) {
+            alert('密钥错误');
+        }
+    }
+
+    function logout() { sessionStorage.clear(); location.reload(); }
+
+    // 页面加载自动重连逻辑
+    window.onload = () => { 
+        const token = sessionStorage.getItem('_auth_token');
+        if (token) {
+            document.getElementById('passInput').value = atob(token);
+            verifyPass();
+        }
+    };
+
+    async function enterWorkbench(u, k) {
+        document.getElementById('authOverlay').style.display = 'none';
+        if (isInitialized) return;
+        isInitialized = true;
+        
+        // 使用解密后的参数初始化
+        client = supabase.createClient(u, k);
+        await loadData();
+        document.getElementById('statusDot').className = 'w-2 h-2 rounded-full bg-green-500';
+        setInterval(loadData, 15000);
+    }
+
+    // --- 以下为原有功能代码，保持不变 ---
+
+    async function loadData() {
+        if (!client) return;
+        const { data: res } = await client.from('pano_storage').select('data_content').eq('id', 1).single();
+        if (res) { data = res.data_content || {}; renderCustomerList(); if(currentCustomer) renderColumns(); }
+    }
+
+    async function sync() { if(client) await client.from('pano_storage').upsert({ id: 1, data_content: data }); }
+
+    function renderCustomerList() {
+        const query = document.getElementById('searchQuery').value.toLowerCase();
+        const list = document.getElementById('customerList');
+        list.innerHTML = '';
+        Object.keys(data).filter(k => k.toLowerCase().includes(query)).sort().forEach(name => {
+            const div = document.createElement('div');
+            div.className = `p-3 rounded-xl cursor-pointer font-bold text-xs mb-1 transition ${currentCustomer === name ? 'sidebar-item-active' : 'hover:bg-white/5'}`;
+            div.innerHTML = `<div class="flex justify-between items-center"><span onclick="selectCustomer('${name}')" class="truncate flex-1">📁 ${name}</span><button onclick="deleteCustomer('${name}')" class="opacity-20 hover:opacity-100 ml-2">✕</button></div>`;
+            list.appendChild(div);
+        });
+    }
+
+    function selectCustomer(name) {
+        currentCustomer = name;
+        document.getElementById('topBar').classList.remove('hidden'); 
+        document.getElementById('mainContent').classList.remove('hidden');
+        document.getElementById('currentCustomerTitle').innerText = name; 
+        renderColumns(); renderCustomerList();
+    }
+
+    function renderColumns() {
+        const cols = { pano: document.getElementById('col-pano'), plan: document.getElementById('col-plan'), file: document.getElementById('col-file') };
+        Object.values(cols).forEach(c => c.innerHTML = '');
+        if(!data[currentCustomer]) return;
+        data[currentCustomer].items.forEach((item, index) => {
+            const card = document.createElement('div');
+            card.className = "asset-card group";
+            const inner = item.type === 'file' 
+                ? `<div class="p-4 font-bold text-xs flex items-center gap-2">📎 ${item.title}</div>` 
+                : `<div class="pano-bg" style="background-image:url('${item.cover || ''}')">${!item.cover?'<span class="opacity-10 text-[20px]">无封面</span>':''}</div><div class="p-3 font-bold text-xs truncate">${item.title}</div>`;
+            
+            card.innerHTML = `
+                <div class="cursor-pointer" onclick="window.open('${item.url}')">${inner}</div>
+                <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                    <button onclick="editItem(${index})" class="bg-blue-500 text-white w-6 h-6 rounded-full text-[10px]">✎</button>
+                    <button onclick="deleteItem(${index})" class="bg-red-500 text-white w-6 h-6 rounded-full text-[10px]">✕</button>
+                </div>`;
+            cols[item.type].appendChild(card);
+        });
+    }
+
+    function addCustomer() {
+        const name = prompt("请输入新项目名称：");
+        if(name && !data[name]) {
+            data[name] = { items: [] };
+            sync();
+            renderCustomerList();
+        }
+    }
+
+    function editItem(index) {
+        editingIndex = index;
+        const item = data[currentCustomer].items[index];
+        document.getElementById('modalTitle').innerText = "编辑资产";
+        document.getElementById('itemType').value = item.type;
+        document.getElementById('itemTitle').value = item.title;
+        document.getElementById('itemUrl').value = item.url;
+        document.getElementById('itemCover').value = item.cover || '';
+        openModal();
+    }
+
+    async function saveItem() {
+        const title = document.getElementById('itemTitle').value;
+        const url = document.getElementById('itemUrl').value;
+        if(!title || !url) return;
+        const newItem = { 
+            type: document.getElementById('itemType').value, 
+            title, url, cover: document.getElementById('itemCover').value 
+        };
+        if (editingIndex > -1) { data[currentCustomer].items[editingIndex] = newItem; } 
+        else { if(!data[currentCustomer].items) data[currentCustomer].items = []; data[currentCustomer].items.push(newItem); }
+        await sync(); renderColumns(); closeModal();
+    }
+
+    async function deleteCustomer(name) { if(confirm(`彻底删除项目 [${name}]？`)) { delete data[name]; await sync(); renderCustomerList(); } }
+    async function deleteItem(index) { if(confirm('确认删除？')) { data[currentCustomer].items.splice(index, 1); await sync(); renderColumns(); } }
+    function openModal() { document.getElementById('modal').classList.remove('hidden'); }
+    function closeModal() { document.getElementById('modal').classList.add('hidden'); editingIndex = -1; document.getElementById('itemTitle').value = ''; document.getElementById('itemUrl').value = ''; document.getElementById('itemCover').value = ''; }
+
+    function copyDeliveryInfo() { 
+        let t = `【${currentCustomer}】清单：\n`; 
+        data[currentCustomer].items.forEach(i => t += `· ${i.title}: ${i.url}\n`); 
+        navigator.clipboard.writeText(t).then(() => alert('清单已复制')); 
+    }
+</script>
+</body>
+</html>
