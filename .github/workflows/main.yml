@@ -1,0 +1,26 @@
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    # 每两天在 UTC 00:30 自动运行一次 (即北京时间 08:30)
+    - cron: '30 0 */2 * *'
+  workflow_dispatch: # 保留手动触发按钮，方便随时测试
+
+jobs:
+  ping_supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake up Supabase via REST API
+        run: |
+          # 发送请求并获取状态码
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/" \
+          -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+          -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}")
+          
+          echo "Supabase 返回状态码: $STATUS_CODE"
+          
+          if [ "$STATUS_CODE" -eq 200 ]; then
+            echo "✅ 保活请求成功！"
+          else
+            echo "⚠️ 请求返回状态码为 $STATUS_CODE，请检查 Secrets 配置是否正确。"
+          fi
