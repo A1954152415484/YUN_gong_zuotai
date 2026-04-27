@@ -2,86 +2,52 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>山屿空间 | 云工作台</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
+        /* 禁止全局按钮、侧边栏项目和功能键的文字被选中 */
+        button, 
+        .sidebar, 
+        .asset-card, 
+        #customerList div, 
+        #mobileYearBtn {
+            /* 修复：移除了导致偏移的 bottom 和 right 属性 */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent; 
+            touch-action: manipulation; 
+        }
+
+        #customerList div span {
+            pointer-events: auto;
+        }
+
+        @media (min-width: 769px) {#mobileYearBtn {display: none !important;}}
+        @media (max-width: 768px) {body:has(#mainPanel.active) #mobileYearBtn {display: none;}}
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap');
         :root { --theme-color: #3b82f6; --bg-main: #f8fafc; --bg-side: #0f172a; --bg-card: #ffffff; --text-main: #1e293b; --border-color: #e2e8f0; }
         body { font-family: 'Noto Sans SC', sans-serif; background-color: var(--bg-main); color: var(--text-main); overflow: hidden; }
         #customerList::-webkit-scrollbar, .column-scroll::-webkit-scrollbar { width: 4px; }
         #customerList::-webkit-scrollbar-thumb, .column-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
-        .sidebar { background-color: var(--bg-side); width: 260px; color: #94a3b8; }
+        .sidebar { background-color: var(--bg-side); width: 260px; color: #94a3b8; flex-shrink: 0; z-index: 20; transition: all 0.3s ease; }
         .sidebar-item-active { background: var(--theme-color) !important; color: white !important; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
         .asset-card { border: 1px solid var(--border-color); background: var(--bg-card); transition: all 0.2s; border-radius: 12px; overflow: hidden; position: relative; }
-        .asset-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
         .pano-bg { height: 130px; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; background-color: #f1f5f9; }
         .column-scroll { height: calc(100vh - 160px); overflow-y: auto; }
         #authOverlay { position: fixed; inset: 0; background: #0f172a; z-index: 100; display: flex; align-items: center; justify-content: center; }
 
-        /* 针对手机端的最终加强版补丁 */
-@media (max-width: 768px) {
-    /* 1. 允许整体滚动 */
-    body { 
-        overflow-y: auto !important; 
-        flex-direction: column !important; 
-        height: auto !important;
-    }
-
-    /* 2. 侧边栏宽度撑满，高度根据内容自适应 */
-    .sidebar { 
-        width: 100% !important; 
-        height: auto !important; 
-        min-height: 300px; /* 给列表一个基础高度 */
-        position: relative !important; 
-        flex-shrink: 0 !important;
-    }
-
-    /* 3. 核心修复：强行显示被 hidden 隐藏的内容区域 */
-    /* 只要是在手机上，一旦进入了工作台，就强行把 display:none 覆盖掉 */
-    main, 
-    main#mainContent, 
-    header#topBar,
-    div#mainContent { 
-        display: flex !important; 
-        visibility: visible !important;
-        opacity: 1 !important;
-        overflow: visible !important; 
-        height: auto !important; 
-        width: 100% !important;
-    }
-
-    /* 4. 三列布局强制转为单列垂直排列 */
-    #mainContent { 
-        flex-direction: column !important; 
-        padding: 15px !important;
-        gap: 30px !important; 
-    }
-
-    /* 5. 每一列取消滚动，随页面整体滚动 */
-    .column-scroll { 
-        height: auto !important; 
-        overflow: visible !important; 
-    }
-
-    /* 6. 顶部栏适配 */
-    #topBar { 
-        position: sticky; 
-        top: 0; 
-        z-index: 40; 
-        background: white !important;
-        border-bottom: 1px solid #e2e8f0;
-        justify-content: space-between !important;
-    }
-
-    /* 7. 资产卡片宽度优化 */
-    .asset-card {
-        width: 100% !important;
-        margin-bottom: 15px;
-    }
-}
+        @media (max-width: 768px) {
+            .sidebar { position: absolute; inset: 0; width: 100%; }
+            main { position: absolute; inset: 0; width: 100%; background: var(--bg-main); z-index: 30; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+            main.active { transform: translateX(0); }
+            #mainContent { flex-direction: column; overflow-y: auto; height: calc(100vh - 64px); padding: 16px; }
+            .column-scroll { height: auto; overflow: visible; margin-bottom: 24px; }
+            .asset-card { margin-bottom: 12px; }
+            #topBar { padding: 0 16px; }
+        }
     </style>
 </head>
 <body class="h-screen flex">
@@ -96,7 +62,15 @@
     </div>
 </div>
 
-<aside class="sidebar flex flex-col shadow-2xl z-20">
+<div id="mobileYearBtn" class="md:hidden fixed bottom-20 right-6 z-50">
+    <button onclick="toggleYearMenu(event)" class="w-12 h-12 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90">
+        <span class="text-lg">📅</span>
+    </button>
+</div>
+
+<div id="yearDropdownMobile" class="hidden fixed bottom-28 right-6 w-32 bg-slate-800 border border-white/10 shadow-2xl rounded-2xl py-2 z-[60] overflow-y-auto max-h-[60vh]"></div>
+
+<aside id="sidebar" class="sidebar flex flex-col shadow-2xl">
     <div class="p-6 flex justify-between items-center text-white">
         <h1 class="font-black text-xl italic tracking-tighter">云工作台</h1>
         <div id="statusDot" class="w-2 h-2 rounded-full bg-orange-500"></div>
@@ -109,125 +83,281 @@
     </div>
 </aside>
 
-<main class="flex-1 flex flex-col relative">
-    <header id="topBar" class="hidden h-16 border-b px-8 flex items-center justify-between bg-white/80 backdrop-blur-md">
-        <h2 id="currentCustomerTitle" class="text-sm font-black text-slate-700"></h2>
-        <div class="flex gap-2">
-            <button onclick="copyDeliveryInfo()" class="px-3 py-1.5 bg-blue-50/50 text-blue-600 rounded-lg text-[10px] font-bold">📋 复制清单</button>
-            <button onclick="openModal()" class="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-[10px] font-bold shadow-lg">+ 新增资产</button>
+<main id="mainPanel" class="flex-1 flex flex-col relative">
+    <header id="topBar" class="h-16 border-b flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="flex items-center ml-6 gap-12">
+            <button onclick="backToList()" class="md:hidden p-2 text-slate-400 hover:text-slate-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <h2 id="currentCustomerTitle" class="text-sm font-black text-slate-700 truncate max-w-[120px] md:max-w-none"></h2>
+            
+            <div class="relative border-l pl-2 ml-2">
+                <button id="yearBtnDesktop" onclick="toggleYearMenu(event)" class="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold flex items-center gap-1 transition">
+                    📅 年份 <span class="opacity-30">▼</span>
+                </button>
+                <div id="yearDropdown" class="hidden absolute top-full left-0 mt-2 w-32 bg-white border border-slate-200 shadow-xl rounded-xl py-2 z-50"></div>
+            </div>
+        </div>
+
+        <div class="flex gap-1 md:gap-2 pr-4 md:pr-8">
+            <button onclick="copyDeliveryInfo()" class="px-2 py-1.5 bg-blue-50/50 text-blue-600 rounded-lg text-[10px] font-bold">📋 复制</button>
+            <button onclick="openModal()" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-[10px] font-bold shadow-lg">+ 新增</button>
         </div>
     </header>
-    <div id="mainContent" class="hidden flex-1 p-6 flex gap-6">
-        <div class="flex-1 min-w-[280px]"><h3 class="text-[10px] font-black opacity-30 mb-4 tracking-widest uppercase">720 全景预览</h3><div id="col-pano" class="column-scroll space-y-4"></div></div>
-        <div class="flex-1 min-w-[280px]"><h3 class="text-[10px] font-black opacity-30 mb-4 tracking-widest uppercase">平面图 / 方案图</h3><div id="col-plan" class="column-scroll space-y-4"></div></div>
-        <div class="flex-1 min-w-[280px]"><h3 class="text-[10px] font-black opacity-30 mb-4 tracking-widest uppercase">项目工程文件</h3><div id="col-file" class="column-scroll space-y-3"></div></div>
+
+    <div id="mainContent" class="flex-1 flex gap-6 overflow-x-hidden p-6">
+        <div class="flex-1 min-w-[280px] md:min-w-0">
+            <h3 class="text-[10px] font-black opacity-30 mb-4 tracking-widest uppercase flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> 720 全景预览
+            </h3>
+            <div id="col-pano" class="column-scroll space-y-4"></div>
+        </div>
+        <div class="flex-1 min-w-[280px] md:min-w-0">
+            <h3 class="text-[10px] font-black opacity-30 mb-4 tracking-widest uppercase flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> 平面图 / 方案图
+            </h3>
+            <div id="col-plan" class="column-scroll space-y-4"></div>
+        </div>
+        <div class="flex-1 min-w-[280px] md:min-w-0">
+            <h3 class="text-[10px] font-black opacity-30 mb-4 tracking-widest uppercase flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span> 项目工程文件
+            </h3>
+            <div id="col-file" class="column-scroll space-y-3"></div>
+        </div>
     </div>
 </main>
 
-<div id="modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-3xl p-8 w-80 shadow-2xl border border-slate-200">
+<div id="modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-[100]">
+    <div class="bg-white rounded-3xl p-8 w-[90%] max-w-sm shadow-2xl">
         <h3 id="modalTitle" class="text-xs font-black mb-4 uppercase text-slate-400">新增资产</h3>
         <div class="space-y-4">
-            <select id="itemType" class="w-full p-2.5 rounded-xl text-xs font-bold border bg-gray-50 outline-none">
+            <select id="itemType" class="w-full p-3 rounded-xl text-sm font-bold border bg-gray-50 outline-none">
                 <option value="pano">720 全景</option>
                 <option value="plan">彩平图</option>
                 <option value="file">项目文件</option>
             </select>
-            <input id="itemTitle" type="text" placeholder="资产标题" class="w-full p-2.5 rounded-xl text-xs border outline-none">
-            <input id="itemUrl" type="text" placeholder="链接地址" class="w-full p-2.5 rounded-xl text-xs border outline-none">
-            <input id="itemCover" type="text" placeholder="封面图链接 (可选)" class="w-full p-2.5 rounded-xl text-xs border outline-none">
+            <input id="itemTitle" type="text" placeholder="资产标题" class="w-full p-3 rounded-xl text-sm border outline-none">
+            <input id="itemUrl" type="text" placeholder="链接地址" class="w-full p-3 rounded-xl text-sm border outline-none">
+            <input id="itemCover" type="text" placeholder="封面图链接 (可选)" class="w-full p-3 rounded-xl text-sm border outline-none">
             <div class="flex gap-2 pt-2">
-                <button onclick="closeModal()" class="flex-1 text-xs opacity-50 font-bold">取消</button>
-                <button onclick="saveItem()" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold">同步云端</button>
+                <button onclick="closeModal()" class="flex-1 text-sm opacity-50 font-bold py-2">取消</button>
+                <button onclick="saveItem()" class="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold">同步云端</button>
             </div>
         </div>
     </div>
 </div>
 
+<div id="customerModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-[110]">
+    <div class="bg-white rounded-3xl p-8 w-[90%] max-w-sm shadow-2xl">
+        <h3 class="text-xs font-black mb-4 uppercase text-slate-400">新建工作项目</h3>
+        <div class="space-y-4">
+            <input id="newCustName" type="text" placeholder="项目名称" class="w-full p-3 rounded-xl text-sm border outline-none">
+            <div class="flex gap-2">
+                <input id="newCustYear" type="number" placeholder="年份 (2024)" class="w-1/2 p-3 rounded-xl text-sm border outline-none">
+                <input id="newCustMonth" type="number" placeholder="月份 (05)" class="w-1/2 p-3 rounded-xl text-sm border outline-none">
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeCustomerModal()" class="flex-1 text-sm opacity-50 font-bold py-2">取消</button>
+                <button onclick="confirmAddCustomer()" class="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold">立即创建</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="dateModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-[110]">
+    <div class="bg-white rounded-3xl p-8 w-[90%] max-w-sm shadow-2xl">
+        <h3 id="dateModalTitle" class="text-xs font-black mb-4 uppercase text-slate-400">修改日期</h3>
+        <div class="space-y-4">
+            <div class="flex gap-2">
+                <input id="editCustYear" type="number" placeholder="年份" class="w-1/2 p-3 rounded-xl text-sm border outline-none">
+                <input id="editCustMonth" type="number" placeholder="月份" class="w-1/2 p-3 rounded-xl text-sm border outline-none">
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeDateModal()" class="flex-1 text-sm opacity-50 font-bold py-2">取消</button>
+                <button onclick="confirmEditDate()" class="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold">确认修改</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="confirmModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-[120]">
+    <div class="bg-white rounded-3xl p-8 w-[90%] max-w-sm shadow-2xl text-center">
+        <div class="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠️</div>
+        <h3 id="confirmTitle" class="text-lg font-bold text-slate-800 mb-2">确认删除？</h3>
+        <p id="confirmDesc" class="text-sm text-slate-500 mb-6">此操作无法撤销，请谨慎操作。</p>
+        <div class="flex gap-2">
+            <button onclick="closeConfirmModal()" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold">点错了</button>
+            <button id="confirmExecuteBtn" class="flex-1 py-3 bg-red-500 text-white rounded-xl text-sm font-bold">确认删除</button>
+        </div>
+    </div>
+</div>
+
 <script>
-    /** * 🔐 核心部分
-     * 在这里替换
-     */
-    const _CONF = "U2FsdGVkX18A4W9U02O7K9wPOinJBysSt1b1qK87oocyqOF+9J3KUAetclNLPjG3DFlgFkFllmxhHFJpASxkw81VN0HOVaZqe1srOiCIoIaEnQjuxQPl2OU82vYmsdv7f+auAlSZB/yU46hTLxFwZHOks/wtMrf9spizjs7Pkl0="; 
+    const _E_U = "aHR0cHM6Ly9nd3d0dWRkZ2hnY25zYXlzcnhqcy5zdXBhYmFzZS5jbw==";
+    const _E_K = "c2JfcHVibGlzaGFibGVfdDFtLTVzbkFZckR1T0dnc2ZsVEZkd19hdFNSSGRZaA==";
+    const _E_P = "U3kxMjM0NTY3OC4="; 
 
     let data = {};
     let client = null;
     let currentCustomer = '';
     let isInitialized = false;
     let editingIndex = -1; 
+    let pressTimer;
+    let targetDateProject = '';
 
-    // 逻辑
+    const _D = (s) => atob(s);
+
     function verifyPass() {
-        const pass = document.getElementById('passInput').value.trim();
-        if(!pass) return;
+        const input = document.getElementById('passInput').value.trim();
+        if (btoa(input) === _E_P) { sessionStorage.setItem('_auth_token', _E_P); enterWorkbench(); } 
+        else { alert('密钥错误！'); }
+    }
 
-        try {
-            // 核心
-            const bytes = CryptoJS.AES.decrypt(_CONF, pass);
-            const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-            
-            if (!decrypted) throw new Error();
+    function backToList() { document.getElementById('mainPanel').classList.remove('active'); }
 
-            const config = JSON.parse(decrypted);
-            // 验证
-            if (config.u && config.k) {
-                sessionStorage.setItem('_auth_token', btoa(pass));
-                enterWorkbench(config.u, config.k);
-            }
-        } catch (e) {
-            alert('密钥错误');
+    function toggleYearMenu(e) {
+        if (e) { e.stopPropagation(); e.preventDefault(); }
+        const isMobile = window.innerWidth <= 768;
+        const deskMenu = document.getElementById('yearDropdown');
+        const mobMenu = document.getElementById('yearDropdownMobile');
+        
+        if (isMobile) {
+            deskMenu.classList.add('hidden');
+            const isHidden = mobMenu.classList.contains('hidden');
+            mobMenu.classList.toggle('hidden');
+            if (isHidden) renderYearOptions(true);
+        } else {
+            mobMenu.classList.add('hidden');
+            const isHidden = deskMenu.classList.contains('hidden');
+            deskMenu.classList.toggle('hidden');
+            if (isHidden) renderYearOptions(false);
         }
     }
 
+    window.addEventListener('click', (e) => {
+        const d1 = document.getElementById('yearDropdown');
+        const d2 = document.getElementById('yearDropdownMobile');
+        const btn1 = document.getElementById('yearBtnDesktop');
+        const btn2 = document.getElementById('mobileYearBtn');
+        if (d1 && !btn1.contains(e.target) && !d1.contains(e.target)) d1.classList.add('hidden');
+        if (d2 && !btn2.contains(e.target) && !d2.contains(e.target)) d2.classList.add('hidden');
+    });
+
     function logout() { sessionStorage.clear(); location.reload(); }
 
-    // 页面加载自动重连逻辑
-    window.onload = () => { 
-        const token = sessionStorage.getItem('_auth_token');
-        if (token) {
-            document.getElementById('passInput').value = atob(token);
-            verifyPass();
-        }
-    };
+    window.onload = () => { if (sessionStorage.getItem('_auth_token') === _E_P) enterWorkbench(); };
 
-    async function enterWorkbench(u, k) {
+    async function enterWorkbench() {
         document.getElementById('authOverlay').style.display = 'none';
         if (isInitialized) return;
         isInitialized = true;
-        
-        // 使用解密后的参数初始化
-        client = supabase.createClient(u, k);
+        client = supabase.createClient(_D(_E_U), _D(_E_K));
         await loadData();
         document.getElementById('statusDot').className = 'w-2 h-2 rounded-full bg-green-500';
         setInterval(loadData, 15000);
     }
 
-    // --- 以下为原有功能代码，保持不变 ---
+    function openConfirmModal(title, desc, action) {
+        document.getElementById('confirmTitle').innerText = title;
+        document.getElementById('confirmDesc').innerText = desc;
+        document.getElementById('confirmModal').classList.remove('hidden');
+        document.getElementById('confirmExecuteBtn').onclick = async () => {
+            await action();
+            closeConfirmModal();
+        };
+    }
+    function closeConfirmModal() { document.getElementById('confirmModal').classList.add('hidden'); }
 
-    async function loadData() {
-        if (!client) return;
-        const { data: res } = await client.from('pano_storage').select('data_content').eq('id', 1).single();
-        if (res) { data = res.data_content || {}; renderCustomerList(); if(currentCustomer) renderColumns(); }
+    function addCustomer() {
+        document.getElementById('customerModal').classList.remove('hidden');
+        document.getElementById('newCustName').value = '';
+        document.getElementById('newCustYear').value = new Date().getFullYear();
+        document.getElementById('newCustMonth').value = (new Date().getMonth() + 1).toString().padStart(2, '0');
+    }
+    function closeCustomerModal() { document.getElementById('customerModal').classList.add('hidden'); }
+    async function confirmAddCustomer() {
+        const name = document.getElementById('newCustName').value.trim();
+        const year = document.getElementById('newCustYear').value.trim();
+        const month = document.getElementById('newCustMonth').value.trim();
+        if (!name) return alert("请输入项目名称");
+        if (data[name]) return alert("项目已存在");
+        data[name] = { year: year || null, month: month || null, items: [] };
+        await sync(); renderCustomerList(); closeCustomerModal();
     }
 
-    async function sync() { if(client) await client.from('pano_storage').upsert({ id: 1, data_content: data }); }
+    function startPress(name) { pressTimer = setTimeout(() => editProjectDate(name), 1000); }
+    function cancelPress() { clearTimeout(pressTimer); }
 
+    function editProjectDate(name) {
+        targetDateProject = name;
+        document.getElementById('dateModal').classList.remove('hidden');
+        document.getElementById('dateModalTitle').innerText = `修改 [${name}] 日期`;
+        document.getElementById('editCustYear').value = data[name].year || "";
+        document.getElementById('editCustMonth').value = data[name].month || "";
+    }
+    function closeDateModal() { document.getElementById('dateModal').classList.add('hidden'); }
+    async function confirmEditDate() {
+        const year = document.getElementById('editCustYear').value.trim();
+        const month = document.getElementById('editCustMonth').value.trim();
+        if (targetDateProject && data[targetDateProject]) {
+            data[targetDateProject].year = year || null;
+            data[targetDateProject].month = month || null;
+            await sync(); renderCustomerList(); closeDateModal();
+        }
+    }
+
+    // --- 核心修复：renderCustomerList 函数 ---
     function renderCustomerList() {
         const query = document.getElementById('searchQuery').value.toLowerCase();
         const list = document.getElementById('customerList');
         list.innerHTML = '';
-        Object.keys(data).filter(k => k.toLowerCase().includes(query)).sort().forEach(name => {
-            const div = document.createElement('div');
-            div.className = `p-3 rounded-xl cursor-pointer font-bold text-xs mb-1 transition ${currentCustomer === name ? 'sidebar-item-active' : 'hover:bg-white/5'}`;
-            div.innerHTML = `<div class="flex justify-between items-center"><span onclick="selectCustomer('${name}')" class="truncate flex-1">📁 ${name}</span><button onclick="deleteCustomer('${name}')" class="opacity-20 hover:opacity-100 ml-2">✕</button></div>`;
-            list.appendChild(div);
+        const nestedGroups = {};
+        Object.keys(data).filter(k => k.toLowerCase().includes(query)).forEach(name => {
+            const year = data[name].year || "未分类";
+            const month = data[name].month || "无月份";
+            if (!nestedGroups[year]) nestedGroups[year] = {};
+            if (!nestedGroups[year][month]) nestedGroups[year][month] = [];
+            nestedGroups[year][month].push(name);
+        });
+        const sortedYears = Object.keys(nestedGroups).sort().reverse();
+        sortedYears.forEach(year => {
+            const yearHeader = document.createElement('div');
+            yearHeader.className = "text-[12px] text-white/50 font-black mt-6 mb-2 px-2 border-b border-white/10 pb-1 text-left";
+            yearHeader.innerText = year === "未分类" ? year : `${year} 年`;
+            list.appendChild(yearHeader);
+            const sortedMonths = Object.keys(nestedGroups[year]).sort().reverse();
+            sortedMonths.forEach(month => {
+                if (month !== "无月份" && year !== "未分类") {
+                    const mHeader = document.createElement('div');
+                    mHeader.className = "text-[10px] text-white/20 font-bold mt-2 mb-1 px-2 italic text-left";
+                    mHeader.innerText = `${month}月`;
+                    list.appendChild(mHeader);
+                }
+                nestedGroups[year][month].forEach(name => {
+                    const div = document.createElement('div');
+                    div.className = `p-3 rounded-xl cursor-pointer font-bold text-xs mb-1 transition ${currentCustomer === name ? 'sidebar-item-active' : 'hover:bg-white/5'}`;
+                    // 修复布局：使用 w-full 和 flex-1 确保文字占据左侧
+                    div.innerHTML = `
+                        <div class="flex items-center justify-between w-full gap-2">
+                            <span onclick="selectCustomer('${name}')" 
+                                  onmousedown="startPress('${name}')" 
+                                  onmouseup="cancelPress()" 
+                                  ontouchstart="startPress('${name}')" 
+                                  ontouchend="cancelPress()" 
+                                  class="truncate flex-1 text-left">
+                                📁 ${name}
+                            </span>
+                            <button onclick="deleteCustomer('${name}')" class="opacity-20 hover:opacity-100 flex-shrink-0 w-4 h-4 flex items-center justify-center">✕</button>
+                        </div>`;
+                    list.appendChild(div);
+                });
+            });
         });
     }
 
     function selectCustomer(name) {
         currentCustomer = name;
-        document.getElementById('topBar').classList.remove('hidden'); 
-        document.getElementById('mainContent').classList.remove('hidden');
+        document.getElementById('mainPanel').classList.add('active');
         document.getElementById('currentCustomerTitle').innerText = name; 
         renderColumns(); renderCustomerList();
     }
@@ -242,25 +372,45 @@
             const inner = item.type === 'file' 
                 ? `<div class="p-4 font-bold text-xs flex items-center gap-2">📎 ${item.title}</div>` 
                 : `<div class="pano-bg" style="background-image:url('${item.cover || ''}')">${!item.cover?'<span class="opacity-10 text-[20px]">无封面</span>':''}</div><div class="p-3 font-bold text-xs truncate">${item.title}</div>`;
-            
-            card.innerHTML = `
-                <div class="cursor-pointer" onclick="window.open('${item.url}')">${inner}</div>
-                <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                    <button onclick="editItem(${index})" class="bg-blue-500 text-white w-6 h-6 rounded-full text-[10px]">✎</button>
-                    <button onclick="deleteItem(${index})" class="bg-red-500 text-white w-6 h-6 rounded-full text-[10px]">✕</button>
-                </div>`;
+            card.innerHTML = `<div class="cursor-pointer" onclick="window.open('${item.url}')">${inner}</div><div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition"><button onclick="editItem(${index})" class="bg-blue-500 text-white w-8 h-8 rounded-full text-[12px]">✎</button><button onclick="deleteItem(${index})" class="bg-red-500 text-white w-8 h-8 rounded-full text-[12px]">✕</button></div>`;
             cols[item.type].appendChild(card);
         });
     }
 
-    function addCustomer() {
-        const name = prompt("请输入新项目名称：");
-        if(name && !data[name]) {
-            data[name] = { items: [] };
-            sync();
-            renderCustomerList();
-        }
+    function renderYearOptions(isMobile) {
+        const menuId = isMobile ? 'yearDropdownMobile' : 'yearDropdown';
+        const dropdown = document.getElementById(menuId);
+        if (!dropdown) return;
+        dropdown.innerHTML = '';
+        const years = [...new Set(Object.values(data).map(d => d.year || "未分类"))].sort().reverse();
+        years.forEach(y => {
+            const item = document.createElement('div');
+            item.className = isMobile 
+                ? "px-4 py-4 text-sm font-bold text-white border-b border-white/5 active:bg-blue-500 text-left"
+                : "px-4 py-2 text-[11px] font-bold text-slate-600 hover:bg-blue-50 cursor-pointer text-left";
+            item.innerText = y === "未分类" ? "📁 未分类" : `📅 ${y} 年`;
+            item.onclick = (ev) => { ev.stopPropagation(); scrollToYear(y); dropdown.classList.add('hidden'); };
+            dropdown.appendChild(item);
+        });
     }
+
+    function scrollToYear(yearLabel) {
+        if (window.innerWidth <= 768) backToList(); 
+        setTimeout(() => {
+            const list = document.getElementById('customerList');
+            const headers = Array.from(list.querySelectorAll('div'));
+            const target = headers.find(el => el.innerText.includes(yearLabel));
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150);
+    }
+
+    async function loadData() {
+        if (!client) return;
+        const { data: res } = await client.from('pano_storage').select('data_content').eq('id', 1).single();
+        if (res) { data = res.data_content || {}; renderCustomerList(); if(currentCustomer) renderColumns(); }
+    }
+
+    async function sync() { if(client) await client.from('pano_storage').upsert({ id: 1, data_content: data }); }
 
     function editItem(index) {
         editingIndex = index;
@@ -277,25 +427,35 @@
         const title = document.getElementById('itemTitle').value;
         const url = document.getElementById('itemUrl').value;
         if(!title || !url) return;
-        const newItem = { 
-            type: document.getElementById('itemType').value, 
-            title, url, cover: document.getElementById('itemCover').value 
-        };
-        if (editingIndex > -1) { data[currentCustomer].items[editingIndex] = newItem; } 
+        const newItem = { type: document.getElementById('itemType').value, title, url, cover: document.getElementById('itemCover').value };
+        if (editingIndex > -1) data[currentCustomer].items[editingIndex] = newItem;
         else { if(!data[currentCustomer].items) data[currentCustomer].items = []; data[currentCustomer].items.push(newItem); }
         await sync(); renderColumns(); closeModal();
     }
 
-    async function deleteCustomer(name) { if(confirm(`彻底删除项目 [${name}]？`)) { delete data[name]; await sync(); renderCustomerList(); } }
-    async function deleteItem(index) { if(confirm('确认删除？')) { data[currentCustomer].items.splice(index, 1); await sync(); renderColumns(); } }
+    function deleteCustomer(name) {
+        openConfirmModal("删除整个项目？", `确认要删除项目 [${name}] 及其所有内容吗？此操作无法恢复。`, async () => {
+            delete data[name];
+            if (currentCustomer === name) {
+                currentCustomer = '';
+                document.getElementById('mainPanel').classList.remove('active');
+            }
+            await sync();
+            renderCustomerList();
+        });
+    }
+
+    function deleteItem(index) {
+        openConfirmModal("确认删除资产？", "确认要从该项目中移除此文件/全景图吗？", async () => {
+            data[currentCustomer].items.splice(index, 1);
+            await sync();
+            renderColumns();
+        });
+    }
+
     function openModal() { document.getElementById('modal').classList.remove('hidden'); }
     function closeModal() { document.getElementById('modal').classList.add('hidden'); editingIndex = -1; document.getElementById('itemTitle').value = ''; document.getElementById('itemUrl').value = ''; document.getElementById('itemCover').value = ''; }
-
-    function copyDeliveryInfo() { 
-        let t = `【${currentCustomer}】清单：\n`; 
-        data[currentCustomer].items.forEach(i => t += `· ${i.title}: ${i.url}\n`); 
-        navigator.clipboard.writeText(t).then(() => alert('清单已复制')); 
-    }
+    function copyDeliveryInfo() { let t = `【${currentCustomer}】清单：\n`; data[currentCustomer].items.forEach(i => t += `· ${i.title}: ${i.url}\n`); navigator.clipboard.writeText(t).then(() => alert('清单已复制')); }
 </script>
 </body>
 </html>
